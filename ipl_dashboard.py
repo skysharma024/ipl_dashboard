@@ -5,22 +5,32 @@ import matplotlib.pyplot as plt
 ipl = pd.read_csv('matches (1).csv')
 deliveries = pd.read_csv('deliveries (1).csv')
 data = deliveries.merge(ipl, left_on='match_id', right_on='id')
+st.set_page_config(layout='wide')
 
-st.title('IPL - Dashboard')
-
-
-
-player = st.sidebar.selectbox('Player',sorted(data['batsman'].unique()))
-search_player = st.sidebar.button('Search')
+st.header('IPL - Dashboard')
 
 
+# Batsman
+player = st.sidebar.selectbox('Batsman',sorted(data['batsman'].unique()))
+search_player = st.sidebar.button('Search_Batsman')
 
+
+bowler = st.sidebar.selectbox('Bowler',sorted(data['bowler'].unique()))
+search_bowler = st.sidebar.button('Search_Bowler')
+
+
+# team vs team
 team1 = st.sidebar.selectbox('Team1',sorted(data['team1'].unique()))
 st.sidebar.write('      Vs    ')
 team2 = st.sidebar.selectbox('Team2',sorted(data['team1'].unique()))
 stats = st.sidebar.button('Stats')
 
 
+
+purple = st.sidebar.button('Purple Cap Holders')
+Orange = st.sidebar.button('Orange Cap Holders')
+TopBatsman = st.sidebar.button("Highest Runs Getter in IPL")
+TopBowler = st.sidebar.button("Highest Wicket Taker in IPL")
 
 
 if search_player:
@@ -84,16 +94,27 @@ if stats:
             Top_Player = row1['player_of_match'].value_counts().index[0]
 
             st.subheader(team1 + "   vs   " + team2)
-            col1, col2 = st.columns(2)
+            st.write("##")
+            col1,col2,col3,col4 = st.columns(4)
+            with col1:
+                st.image(team1+'.jpg')  #Chennai Super Kings.jpg
+            with col2:
+                st.subheader('Head to Head')
+            with col3:
+                st.image(team2+'.jpg')
+            with col4:
+                st.write()
 
+            st.write("##")
+            col1,col2 = st.columns(2)
             with col1:
 
 
-                st.write("Total Matches Played  = ", total_matches)
-                st.write(team1, ' won = ', team1_won)
-                st.write(team2, ' won = ', team2_won)
-                st.write('Draw = ', draw)
-                st.write('Player who got the most POTM **awards**  = ', Top_Player)
+                st.write(":blue[Total Matches Played]  = ", total_matches)
+                st.write(team1, ':blue[won] = ', team1_won)
+                st.write(team2, ':blue[won] = ', team2_won)
+                st.write(':blue[Draw] = ', draw)
+                st.write(':blue[Most POTM awards ] = ', Top_Player)
 
             with col2:
                 fig3, ax3 = plt.subplots()
@@ -105,3 +126,68 @@ if stats:
 
 
 
+if purple:
+    df = data[(~data['player_dismissed'].isnull()) & (data['dismissal_kind'] != 'run out')].groupby('season')['bowler'].value_counts().reset_index(name='count')
+    season = pd.Series(df['season'].unique())
+
+    l = []
+    def purple_cap(year):
+        l.append([df[df['season'] == year].head(1).values[0][0],df[df['season'] == year].head(1).values[0][1],df[df['season'] == year].head(1).values[0][2]])
+
+
+    season.apply(purple_cap)
+    w=pd.DataFrame(l,columns=['Year','Player','Wickets'])
+    st.dataframe(w)
+
+if Orange:
+    s = data.groupby(['season', 'batsman'])['batsman_runs'].sum().reset_index().sort_values('batsman_runs',
+                                                                                           ascending=False).drop_duplicates(subset=['season'], keep='first').sort_values('season')
+    st.dataframe(s)
+
+if TopBatsman:
+    st.dataframe(data.groupby('batsman')['batsman_runs'].sum().sort_values(ascending=False).head(10).reset_index())
+
+if TopBowler:
+    st.dataframe(data[(~data['player_dismissed'].isnull()) & (data['dismissal_kind'] != 'run out')]['bowler'].value_counts().head(10).reset_index(name='count'))
+
+if search_bowler:
+    st.header(bowler)
+    col1,col2 = st.columns(2)
+    with st.container():
+        with col1:
+            st.image('MS Dhoni.jpg', width=200)
+        with col2:
+
+            def bowler_data(bowler):
+                ipl = pd.read_csv('matches (1).csv')
+                deliveries = pd.read_csv('deliveries (1).csv')
+                data = deliveries.merge(ipl, left_on='match_id', right_on='id')
+
+                bowls = data[data['bowler'] == bowler]
+                runs_conceded = bowls['batsman_runs'].sum()
+                wickets = bowls[(~bowls['player_dismissed'].isnull()) & (bowls['dismissal_kind'] != 'run out')]
+                avg = runs_conceded / wickets.shape[0]
+                strike_rate = bowls.shape[0] / wickets.shape[0]
+                season = wickets.groupby(['season', 'bowler'])['bowler'].count().reset_index(name='count')
+                return season,wickets.shape[0],avg,strike_rate
+
+
+            t = bowler_data(bowler)
+
+            st.metric('Wickets ' , t[1])
+            st.metric('Average  ', round(t[2],2))
+            st.metric('Strike_rate  ', t[3])
+
+    with st.container():
+        st.write('##')
+        col1, col2 = st.columns(2)
+
+
+        with col1:
+            st.dataframe(t[0])
+
+        with col2:
+
+            fig3 , ax3 = plt.subplots()
+            ax3.bar(t[0]['season'],t[0]['count'])
+            st.pyplot(fig3)
